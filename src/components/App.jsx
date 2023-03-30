@@ -1,4 +1,4 @@
-import { Component } from "react";
+import { useState, useEffect } from "react";
 import { ToastContainer, toast} from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.min.css';
 import { Button } from "./Button/Button";
@@ -8,47 +8,60 @@ import { Searchbar } from "./Searchbar/Searchbar";
 import * as API from 'Services/services';
 import { GlobalStyle } from './GlobalStyle';
 import { Wrapper } from './App.styled';
-export class App extends Component {
-  state = {
-  inputValue: '',
-  page: 1,
-  images: [],
-  status: 'idle',
-  showLoadMore: false,
-  }
 
-  async componentDidUpdate(prevProps, prevState) {
-    const { inputValue, page } = this.state;
+const Status = {
+  IDLE: 'idle',
+  PENDING: 'pending',
+  RESOLVED: 'resolved',
+  REJECTED: 'rejected',
+};
 
-    if (prevState.inputValue !== inputValue || prevState.page !== page) {
-       
-      try {
-        this.setState({ status: 'pending' });
-        const data = await API.fetchImages(inputValue, page);
-        if (data.hits.length === 0) {
-          this.setState({ images: [],  status: 'rejected'});
-          }
-       this.setState(prevState => ({
-          images: [...prevState.images, ...data.hits],
-          status: 'resolved',
-          showLoadMore: this.state.page < Math.ceil(data.totalHits / 12)
-       }
-       ));
-      } catch (error) {
-        console.log(error);
-      } 
+export const App = () =>{
+  const [inputValue, setInputValue] = useState('');
+  const [page, setPage] = useState(1);
+  const [images, setImages] = useState([]);
+  const [status, setStatus] = useState(Status.IDLE);
+  const [showLoadMore, setShowLoadMore] = useState(false);  
+ 
+  useEffect(() => {
+    if (!inputValue) {
+      return;
     }
-  }
+    setStatus(Status.PENDING);
+    
+    API.fetchImages(inputValue, page)
+      .then(data => {
+        if (data.hits.length === 0) {
+          setImages([]);
+        setStatus(Status.REJECTED)
+        return;
+      }
+        setImages(images => [...images, ...data.hits]);
+        // setStatus(status.RESOLVED);
+         setShowLoadMore(page < Math.ceil(data.totalHits / 12))     
+       }
+       )       
+      .catch(error => {
+      console.log(error);
+    setStatus(Status.REJECTED);
+      })
+    .finally(setStatus(Status.RESOLVED));
+   }, [inputValue, page]);
+     
 
-  handleFormSubmit = inputValue => {
-    this.setState({ inputValue, images: [], page: 1 });
-     this.pageScrollToTop();
+       
+     
+  const handleFormSubmit = inputValue => {
+    setInputValue(inputValue);
+    setImages([]);
+    setPage(1);
+    pageScrollToTop();
     };
 
-  handleOnClick = () => {
-      this.setState(prevState => ({ page: prevState.page + 1, }));
+   const handleOnClick = () => {
+      setPage(prevState => prevState + 1);
   }
-   pageScrollToTop() {
+   const pageScrollToTop = () =>{
     window.scrollTo({
       top: 0,
       behavior: 'smooth',
@@ -56,24 +69,22 @@ export class App extends Component {
     return;
   }
 
-  render() {
-  const { images, status, showLoadMore } = this.state;
-    return (
+      return (
       <>
       <GlobalStyle />
       <Wrapper >
-        <Searchbar onSubmit={this.handleFormSubmit} />
-        {status === 'pending' && <Loader />}
-        {status === 'rejected' && toast.error('Sorry, something went wrong. Please, try again')}
+        <Searchbar onSubmit={handleFormSubmit} />
+        {status === Status.PENDING && <Loader />}
+        {status === Status.REJECTED && toast.error('Sorry, something went wrong. Please, try again')}
 
         <ImageGallery images={images} />
-        {showLoadMore && <Button onClick={this.handleOnClick} />}
+        {showLoadMore && <Button onClick={handleOnClick} />}
         <ToastContainer autoClose={3000} />
         </Wrapper>
         </>
     );
   }
-}
+
 
 
 
